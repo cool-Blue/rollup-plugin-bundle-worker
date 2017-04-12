@@ -14,5 +14,8 @@
     "worker"
   ],
   "author": "Andy Earnshaw",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "uglify-js": "github:mishoo/UglifyJS2#harmony"
+  }
 }
