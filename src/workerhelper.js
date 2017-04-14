@@ -1,5 +1,5 @@
 var TARGET = typeof Symbol === 'undefined' ? '__target' : Symbol(),
-    SCRIPT_TYPE = 'application/javascript',
+    SCRIPT_TYPE = 'text/javascript',
     BlobBuilder = window.BlobBuilder || window.WebKitBlobBuilder || window.MozBlobBuilder || window.MSBlobBuilder,
     URL = window.URL || window.webkitURL,
     Worker = window.Worker;
@@ -12,23 +12,28 @@ var TARGET = typeof Symbol === 'undefined' ? '__target' : Symbol(),
  * @param { String }    filename    The name of the file
  * @param { Function }  fn          Function wrapping the code of the worker
  */
-export default function shimWorker (filename, fn) {
+export default function shimWorker (filename, fn, injecting) {
     return function ShimWorker (forceFallback) {
         var o = this;
 
-        if (!fn) {
+        if (!fn || typeof fn !== 'function') {
             return new Worker(filename);
         }
         else if (Worker && !forceFallback) {
             // Convert the function's inner code to a string to construct the worker
             var source = `${ fn }`.replace(/^function.+?{/, '').slice(0, -1),
                 objURL = createSourceObject(source);
-
             this[TARGET] = new Worker(objURL);
+
             wrapTerminate(this[TARGET], objURL);
+
+            if (injecting)
+                this[TARGET].addEventListener('message', startSequence(this[TARGET]));
+
             return this[TARGET];
         }
         else {
+            // todo add dispatcher for on message
             var selfShim = {
                     postMessage: m => {
                         if (o.onmessage) {
@@ -94,3 +99,43 @@ function wrapTerminate(worker, objURL){
         term.call(worker);
     }
 }
+
+function startSequence(webWorker) {
+    const hostPath = document.location.pathname.match(/(^.*\/)\w+\.html/)[1];
+    const log = console.log.bind(console);
+    const _routes = {
+        message:
+            function (m) {
+                log(`${m} ${"Received in main"}`);
+            },
+        timeStamp:
+            function (m) {
+                this.message(`${m.t.fmt()}\t${m.m}`)
+            },
+        injected:
+            function (m) {
+                webWorker.postMessage({
+                    method: 'route',
+                    message: `${performance.now().fmt()}\tinjected`
+                });
+                this.message(m);
+                webWorker.removeEventListener('message', listener);
+            },
+        ready:
+            function (m) {
+                log(`${performance.now().fmt()}\tready:\tsimpleWorker.js`);
+                webWorker.postMessage({
+                    method: 'inject',
+                    message: document.location.protocol + '//' + document.location.host + hostPath
+                });
+                this.timeStamp(m);
+            }
+    };
+    function listener(e){
+        _routes[e.data.method](e.data.message);
+        e.stopImmediatePropagation();
+    }
+    return listener
+}
+
+

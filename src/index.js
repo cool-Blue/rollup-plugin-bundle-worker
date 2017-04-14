@@ -1,11 +1,11 @@
 var fs = require('fs'),
     path = require('path'),
-    UglifyJS = require('uglify-js'),
-    paths = new Map();
+    paths = new Map(),
+    injectorPath;
 
-module.exports = function (options) {
-    options = options || {};
-    include = options.include || [];
+export default function (options) {
+    var options = options || {};
+    var include = options.include || [];
     var name = 'bundle-worker';
     var plugins;
     function resolver(importee, importer) {
@@ -57,33 +57,45 @@ module.exports = function (options) {
             }
 
             var workerCode = fs.readFileSync(id, 'utf-8');
-            var ast = UglifyJS.parse(workerCode);
-
-            workerCode = workerCode.replace(/^import inject from 'inject'/,
-                `function inject(req, imports, module) {
-                    return function inject(baseURL) {
-                        let reqUrl = baseURL + req;
-                        let importsURL = imports.map(function (u) {
-                            return baseURL + u;
-                        });
-                        importScripts(reqUrl);
-                        require(['require'].concat(importsURL),
-                            function () {
-                                module.apply(this, Array.from(arguments).slice(1))
+            var rexp = /^\s*import\s+(\w+)\s+from 'worker-injector';/gm;
+            var inject = rexp.test(workerCode);
+            if (inject)
+                workerCode = workerCode.replace(rexp,
+                    `function $1(req, imports, module) {
+                        return function inject(baseURL) {
+                            let reqUrl = baseURL + req;
+                            let importsURL = imports.map(function (u) {
+                                return baseURL + u;
                             });
-                    }
-                }`
-            );
+                            importScripts(reqUrl);
+                            require(['require'].concat(importsURL),
+                                function () {
+                                    module.apply(this, Array.from(arguments).slice(1))
+                                });
+                        }
+                    }`
+                );
 
             var code = [
                 `import shimWorker from 'rollup-plugin-bundle-worker';`,
                 `export default new shimWorker(${JSON.stringify(paths.get(id))}, function (window, document) {`,
-                `var self = this;`,
-                workerCode,
-                `\n});`
-            ].join('\n');
+                `var self = this`,
+                workerCode]
+                    .concat( inject ?
+                        [`self.postMessage({`,
+                        `    method: 'ready',`,
+                        `    message: {t: performance.now(), m: '\tloaded:\t${id}'}`,
+                        `});`]
+                        : []
+                    )
+                .concat(
+                    [
+                        `\n}, ${inject});`
+                    ]
+                )
+                .join('\n');
 
             return code;
-        }
+        },
     };
 }
