@@ -1,0 +1,38 @@
+{
+  "name": "rollup-webworker",
+  "version": "1.0.0",
+  "description": "Web Worker in rollup including importScript from blob",
+  "main": "build/bundle.js",
+  "module": "build/bundle.es.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build-main": "rollup -c",
+    "build-shared": "cd src/common && rollup -c && cd ../../",
+    "build": "cd src/common && rollup -c && cd ../../ && rollup -c"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cool-Blue/rollup-worker.git"
+  },
+  "keywords": [
+    "rollup",
+    "web",
+    "worker",
+    "importScript",
+    "requirejs"
+  ],
+  "author": "cool.blue@y7mail.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cool-Blue/rollup-worker/issues"
+  },
+  "homepage": "https://github.com/cool-Blue/rollup-worker#readme",
+  "devDependencies": {
+    "rollup": "^0.41.6",
+    "rollup-plugin-bundle-worker": "^0.1.0",
+    "rollup-pluginutils": "^2.0.1"
+  },
+  "dependencies": {
+    "requirejs": "^2.3.3"
+  }
+}
